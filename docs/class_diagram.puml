@@ -1,0 +1,147 @@
+@startuml
+skinparam classAttributeIconSize 0
+title Thermo-Poroelastic Wave Simulator — Python UML
+package models {
+  class MechanicalProperties <<dataclass>> {
+    +phi: float
+    +rho_s: float
+    +rho_f: float
+    +a_inf: float
+    +k0: float
+    +eta: float
+    +lambda_: float
+    +mu: float
+    +m: float
+    +alpha: float
+    +viscous_length: float
+    +validate(): None
+  }
+  class ThermalProperties <<dataclass>> {
+    +C: float
+    +beta_s: float
+    +beta_f: float
+    +kappa: float
+    +tau0: float
+    +theta0: float
+    +validate(): None
+  }
+  class PorousMedium {
+    +mechanical: MechanicalProperties
+    +thermal: ThermalProperties
+    +validate(): None
+    +rho(): float
+    +rho_w(): float
+    +b0(): float
+    +beta(): float
+    +A(): float
+    +B(): float
+  }
+  class SimulationConfig <<dataclass>> {
+    +omega_min: float
+    +omega_max: float
+    +num_points: int
+    +use_logspace: bool
+    +validate(): None
+  }
+  enum WaveMode {
+    P1
+    P2
+    T
+  }
+  class ModeState <<dataclass>> {
+    +mode: WaveMode
+    +omega: float
+    +z: complex
+    +k: complex
+    +phase_velocity: float
+    +q_inverse: float
+    +attenuation: float
+  }
+  class SimulationResult {
+    +model_name: str
+    +omega: ndarray
+    +modes: dict
+    +phase_velocity(mode): ndarray
+    +q_inverse(mode): ndarray
+    +attenuation(mode): ndarray
+  }
+}
+package physics {
+  abstract class ResistanceModel {
+    +G(omega, medium): complex
+    +R_omega(omega, medium): complex
+  }
+  class DarcyResistance {
+    +G(omega, medium): complex
+  }
+  class BiotJKDResistance {
+    +fc(medium): float
+    +pride_number(medium): float
+    +omega_relaxation(medium): float
+    +G(omega, medium): complex
+  }
+  class ReciprocalRModel {
+    -medium: PorousMedium
+    -resistance: ResistanceModel
+    +t_omega(omega): complex
+    +polynomial_coefficients(omega): ndarray
+    +dispersion_matrix(omega, k): ndarray
+  }
+}
+package numerics {
+  class FrequencyGrid {
+    +omega: ndarray
+    +build(config): FrequencyGrid
+  }
+  class PolynomialRootSolver {
+    +solve(coefficients): ndarray
+    +check_residuals(coefficients, roots): ndarray
+  }
+  class ModeTracker {
+    +initialize_modes(roots, omega): list
+    +track(previous_modes, roots, omega): list
+    +calculate_properties(omega, k): dict
+  }
+}
+package simulation {
+  class ThermoPoroelasticWaveSimulator {
+    -medium: PorousMedium
+    -config: SimulationConfig
+    -resistance: ResistanceModel
+    -model: ReciprocalRModel
+    -solver: PolynomialRootSolver
+    -tracker: ModeTracker
+    +run(): SimulationResult
+  }
+}
+package visualization {
+  class PlotService {
+    +plot_phase_velocity(result): Figure
+    +plot_attenuation(result): Figure
+    +plot_model_comparison(results): Figure
+  }
+}
+component "app.py\nStreamlit Interface" as App
+PorousMedium *-- MechanicalProperties
+PorousMedium *-- ThermalProperties
+SimulationResult *-- "0..*" ModeState
+ModeState --> WaveMode
+ResistanceModel <|-- DarcyResistance
+ResistanceModel <|-- BiotJKDResistance
+ReciprocalRModel --> PorousMedium
+ReciprocalRModel --> ResistanceModel
+ResistanceModel ..> PorousMedium
+FrequencyGrid ..> SimulationConfig
+ModeTracker ..> PolynomialRootSolver
+ThermoPoroelasticWaveSimulator --> PorousMedium
+ThermoPoroelasticWaveSimulator --> SimulationConfig
+ThermoPoroelasticWaveSimulator --> ResistanceModel
+ThermoPoroelasticWaveSimulator --> ReciprocalRModel
+ThermoPoroelasticWaveSimulator --> FrequencyGrid
+ThermoPoroelasticWaveSimulator --> PolynomialRootSolver
+ThermoPoroelasticWaveSimulator --> ModeTracker
+ThermoPoroelasticWaveSimulator --> SimulationResult
+App ..> ThermoPoroelasticWaveSimulator
+App ..> PlotService
+PlotService ..> SimulationResult
+@enduml
